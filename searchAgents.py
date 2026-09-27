@@ -295,15 +295,20 @@ class CornersProblem(search.SearchProblem):
         Returns the start state (in your state space, not the full Pacman state
         space)
         """
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        visitedCorners = frozenset()
+
+        if self.startingPosition in self.corners:
+            visitedCorners = frozenset([self.startingPosition])
+
+        return (self.startingPosition, visitedCorners)
 
     def isGoalState(self, state: Any):
         """
         Returns whether this search state is a goal state of the problem.
         """
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        currentPosition, visitedCorners = state
+
+        return len(visitedCorners) == len(self.corners)
 
     def getSuccessors(self, state: Any):
         """
@@ -317,6 +322,10 @@ class CornersProblem(search.SearchProblem):
         """
 
         successors = []
+
+        currentPosition, visitedCorners = state
+        x, y = currentPosition
+
         for action in [Directions.NORTH, Directions.SOUTH, Directions.EAST, Directions.WEST]:
             # Add a successor state to the successor list if the action is legal
             # Here's a code snippet for figuring out whether a new position hits a wall:
@@ -325,7 +334,22 @@ class CornersProblem(search.SearchProblem):
             #   nextx, nexty = int(x + dx), int(y + dy)
             #   hitsWall = self.walls[nextx][nexty]
 
-            "*** YOUR CODE HERE ***"
+            dx, dy = Actions.directionToVector(action)
+            nextx, nexty = int(x + dx), int(y + dy)
+
+            # Only create a successor if the move does not hit a wall
+            if not self.walls[nextx][nexty]:
+
+                nextPosition = (nextx, nexty)
+                nextVisitedCorners = visitedCorners
+
+                # Record the corner if this move reaches one
+                if nextPosition in self.corners:
+                    nextVisitedCorners = visitedCorners | frozenset([nextPosition])
+
+                nextState = (nextPosition, nextVisitedCorners)
+
+                successors.append((nextState, action, 1))
 
         self._expanded += 1 # DO NOT CHANGE
         return successors
