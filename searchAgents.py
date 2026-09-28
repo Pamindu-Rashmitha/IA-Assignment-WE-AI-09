@@ -35,6 +35,7 @@ Good luck and happy searching!
 """
 
 from typing import List, Tuple, Any
+from collections import deque
 from game import Directions
 from game import Agent
 from game import Actions
@@ -525,7 +526,64 @@ def foodHeuristic(state: Tuple[Tuple, List[List]], problem: FoodSearchProblem):
     """
     position, foodGrid = state
     "*** YOUR CODE HERE ***"
-    return 0
+    foodList = foodGrid.asList()
+    if not foodList:
+        return 0
+
+    # Retrieve or precompute all-pairs maze distances using BFS
+    if 'dist_map' not in problem.heuristicInfo:
+        walls = problem.walls
+        width = walls.width
+        height = walls.height
+        dist_map = {}
+        walkable = [(x, y) for x in range(width) for y in range(height) if not walls[x][y]]
+
+        for start in walkable:
+            dists = {start: 0}
+            queue = deque([start])
+            while queue:
+                curr = queue.popleft()
+                d = dists[curr]
+                for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                    nxt = (curr[0] + dx, curr[1] + dy)
+                    if not walls[nxt[0]][nxt[1]] and nxt not in dists:
+                        dists[nxt] = d + 1
+                        queue.append(nxt)
+            dist_map[start] = dists
+        problem.heuristicInfo['dist_map'] = dist_map
+    else:
+        dist_map = problem.heuristicInfo['dist_map']
+
+    p_dists = dist_map[position]
+    distanceToClosestFood = min(p_dists[f] for f in foodList)
+    distanceToFarthestFood = max(p_dists[f] for f in foodList)
+
+    # Calculate Minimum Spanning Tree (MST) cost for remaining food dots using Prim's algorithm
+    foodKey = tuple(sorted(foodList))
+    mstCache = problem.heuristicInfo.setdefault('mst_cache', {})
+    if foodKey not in mstCache:
+        if len(foodList) <= 1:
+            mstCost = 0
+        else:
+            connected = [foodList[0]]
+            unconnected = set(foodList[1:])
+            mstCost = 0
+            minDistToTree = {u: dist_map[foodList[0]].get(u, 999999) for u in unconnected}
+
+            while unconnected:
+                closest = min(unconnected, key=lambda u: minDistToTree[u])
+                mstCost += minDistToTree[closest]
+                unconnected.remove(closest)
+                closestDists = dist_map[closest]
+                for u in unconnected:
+                    d = closestDists.get(u, 999999)
+                    if d < minDistToTree[u]:
+                        minDistToTree[u] = d
+        mstCache[foodKey] = mstCost
+    else:
+        mstCost = mstCache[foodKey]
+
+    return max(distanceToFarthestFood, distanceToClosestFood + mstCost)
 
 class ClosestDotSearchAgent(SearchAgent):
     "Search for all food using a sequence of searches"
